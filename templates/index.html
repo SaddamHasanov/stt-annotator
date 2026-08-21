@@ -1,0 +1,2018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>STT Annotator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0F0F0F;--surface:#1C1C1E;--border:#2C2C2E;
+    --text:#F5F0E8;--muted:#8E8E93;
+    --accent:#E8A44A;--adim:#7A5520;
+    --op:#6B9FE4;--cu:#5DBF85;
+    --err:#FF453A;--ok:#30D158;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:30}
+  .logo{display:flex;align-items:center;gap:9px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .logo span{font-size:14px;font-weight:600}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--border);color:var(--muted)}
+
+  /* Mode Toggle & AI button */
+  .mode-toggle{display:flex;background:var(--border);border-radius:20px;padding:2px;gap:2px}
+  .btn-mode{background:transparent;border:none;border-radius:18px;color:var(--muted);
+    font-family:'Inter',sans-serif;font-weight:600;font-size:12px;padding:6px 14px;
+    cursor:pointer;transition:all .15s}
+  .btn-mode.active{background:var(--accent);color:#0F0F0F;box-shadow:0 0 8px rgba(232,164,74,.3)}
+  .btn-mode:hover:not(.active){color:var(--text)}
+
+  .ai-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);padding:10px 18px;font-size:13px;display:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s}
+  .ai-btn:hover{background:var(--adim);color:var(--text);box-shadow:0 0 12px rgba(232, 164, 74, 0.25)}
+  .ai-btn:active{transform:scale(.97)}
+  .ai-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .fix-times-btn{background:transparent;border:1px solid var(--op);color:var(--op);padding:10px 18px;font-size:13px;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s}
+  .fix-times-btn:hover{background:rgba(107,159,228,0.15);box-shadow:0 0 12px rgba(107,159,228,0.25)}
+  .fix-times-btn:active{transform:scale(.97)}
+  .fix-times-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .num-btn{background:transparent;border:1px solid var(--cu);color:var(--cu);padding:10px 18px;font-size:13px;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s}
+  .num-btn:hover{background:rgba(93,191,133,0.14);box-shadow:0 0 12px rgba(93,191,133,0.22)}
+  .num-btn:active{transform:scale(.97)}
+  .num-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .ai-audio-btn{background:transparent;border:1px solid var(--ok);color:var(--ok);padding:10px 18px;font-size:13px;display:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s}
+  .ai-audio-btn:hover{background:rgba(48,209,88,0.12);box-shadow:0 0 12px rgba(48,209,88,0.25)}
+  .ai-audio-btn:active{transform:scale(.97)}
+  .ai-audio-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .model-select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;padding:8px 12px;outline:none;cursor:pointer;display:none;transition:all .15s}
+  .model-select:hover{border-color:var(--accent)}
+  .model-select:focus{border-color:var(--accent);box-shadow:0 0 8px rgba(232,164,74,.2)}
+
+  /* Rules Modal Styling */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:1000;opacity:0;transition:opacity .2s ease}
+  .modal-backdrop.show{display:flex;opacity:1}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:90%;max-width:650px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,0.5);transform:translateY(20px);transition:transform .2s ease;overflow:hidden;will-change:transform}
+  .modal-backdrop.show .modal{transform:translateY(0)}
+  .modal-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .modal-title{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+  .modal-close{background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .15s}
+  .modal-close:hover{background:var(--border);color:var(--text)}
+  .modal-body{padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+  .modal-body::-webkit-scrollbar{width:4px}
+  .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+  .shell{max-width:1440px;margin:0 auto;padding:14px 18px 18px}
+  .main{display:grid;grid-template-columns:290px 1fr;gap:16px}
+  @media(max-width:900px){.main{grid-template-columns:1fr}}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+  .clabel{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+  .btn{border:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;transition:all .15s}
+  .btn:active{transform:scale(.97)}
+  .primary{background:var(--accent);color:#0F0F0F;padding:10px 18px;font-size:13px}
+  .primary:hover{background:#f0b864}
+  .primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .ghost{background:var(--border);color:var(--muted);padding:10px 14px;font-size:13px}
+  .ghost:hover{color:var(--text)}
+  .icon-btn{background:var(--border);border:none;color:var(--text);border-radius:7px;
+    width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:13px;flex-shrink:0;transition:all .15s}
+  .icon-btn:hover{background:var(--adim);color:var(--accent)}
+  .play-btn{width:42px;height:42px;background:var(--accent);color:#0F0F0F;box-shadow:0 0 14px rgba(232,164,74,.3)}
+  .play-btn:hover{background:#f0b864}
+  .speed{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;
+    background:var(--border);border:none;color:var(--muted);border-radius:6px;
+    padding:6px 9px;cursor:pointer}
+  .speed:hover{color:var(--accent)}
+
+  /* ── Studio: audio + segment crop editor ─────────────────────────────── */
+  .studio{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px 10px;margin-bottom:14px;position:sticky;top:58px;z-index:20}
+  .studio.collapsed .studio-body{display:none}
+  .studio-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .studio-file{font-size:12px;color:var(--muted);max-width:230px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+  .studio-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
+  .vol-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);min-width:120px}
+  input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--border);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer}
+
+  .wave-box{position:relative;background:var(--bg);border:1px solid var(--border);
+    border-radius:9px;overflow:hidden;margin-bottom:8px}
+  .wave-box canvas{display:block;width:100%}
+  #overview-canvas{height:46px;cursor:pointer}
+  #zoom-canvas{height:158px;cursor:crosshair;touch-action:none}
+  .wave-tag{position:absolute;font-family:'JetBrains Mono',monospace;font-size:9.5px;
+    color:var(--muted);pointer-events:none;letter-spacing:.03em}
+
+  .region-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding-top:8px;border-top:1px solid var(--border)}
+  .time-field{background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:12.5px;
+    padding:6px 9px;width:104px;text-align:center;outline:none;transition:all .15s}
+  .time-field:focus{border-color:var(--accent);box-shadow:0 0 7px rgba(232,164,74,.2)}
+  .nudge{background:var(--border);border:none;color:var(--muted);border-radius:5px;
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:5px 6px;cursor:pointer;transition:all .12s}
+  .nudge:hover{background:var(--adim);color:var(--accent)}
+  .nudge-group{display:flex;gap:3px}
+  .dur-pill{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);
+    background:var(--border);border-radius:20px;padding:4px 11px;white-space:nowrap}
+  .region-hint{font-size:11px;color:var(--muted);flex:1;min-width:150px;text-align:right;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toggle-btn{background:var(--border);border:1px solid transparent;color:var(--muted);
+    border-radius:7px;font-size:11.5px;font-weight:600;padding:6px 11px;cursor:pointer;transition:all .15s}
+  .toggle-btn:hover{color:var(--text)}
+  .toggle-btn.on{background:var(--adim);border-color:var(--accent);color:var(--accent)}
+  .region-play{background:var(--accent);color:#0F0F0F;border:none;border-radius:7px;
+    font-weight:600;font-size:12px;padding:7px 14px;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .region-play:hover{background:#f0b864}
+  .region-play:disabled{opacity:.35;cursor:not-allowed}
+
+  .queue{display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto}
+  .qitem{padding:9px 11px;border-radius:8px;border:1px solid transparent;cursor:pointer;
+    display:flex;align-items:center;gap:8px;font-size:12px;transition:all .12s}
+  .qitem:hover{background:var(--border)}
+  .qitem.active{background:var(--adim);border-color:var(--adim);color:var(--accent);font-weight:500}
+  .qnum{font-size:10px;color:var(--muted);margin-left:auto;font-family:'JetBrains Mono',monospace}
+
+  .seg-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:calc(100vh - 470px);min-height:220px;padding-right:4px}
+  .seg-list::-webkit-scrollbar{width:3px}
+  .seg-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .seg{display:grid;grid-template-columns:158px 1fr;gap:10px;align-items:start;
+    padding:9px 12px;border-radius:9px;border:1px solid transparent;cursor:pointer;transition:all .12s}
+  .seg:hover{background:rgba(255,255,255,.02)}
+  .seg.playing{border-color:var(--accent)!important;background:rgba(232,164,74,.05)}
+  .seg.active-crop{background:rgba(232,164,74,.09);box-shadow:inset 0 0 0 1px rgba(232,164,74,.35)}
+  .seg.op{border-left:3px solid var(--op)}
+  .seg.cu{border-left:3px solid var(--cu)}
+  .seg-meta{display:flex;flex-direction:column;gap:3px}
+  .seg-speaker{font-size:11px;font-weight:600;cursor:pointer;user-select:none;transition:color .15s}
+  .seg-speaker:hover{text-decoration:underline}
+  .seg-speaker.op{color:var(--op)}
+  .seg-speaker.cu{color:var(--cu)}
+  .seg-time{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10.5px;outline:none;width:152px;padding:2px 0;transition:all .15s}
+  .seg-time:focus{border-bottom-color:var(--accent);color:var(--text)}
+  .seg-time.shifted{color:var(--accent)}
+  .seg-crop-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:10px;align-self:flex-start;opacity:0.35;transition:all .15s;padding:2px 4px;border-radius:4px;margin-top:2px}
+  .seg:hover .seg-crop-btn{opacity:0.85}
+  .seg-crop-btn:hover{color:var(--accent);background:rgba(232,164,74,0.1);opacity:1!important}
+  .seg-delete-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:10px;margin-top:auto;align-self:flex-start;opacity:0.3;transition:all .15s;padding:2px 4px;border-radius:4px}
+  .seg:hover .seg-delete-btn{opacity:0.8}
+  .seg-delete-btn:hover{color:var(--err);background:rgba(255, 69, 58, 0.1);opacity:1!important}
+  .seg-add-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:10px;margin-top:2px;align-self:flex-start;opacity:0.3;transition:all .15s;padding:2px 4px;border-radius:4px}
+  .seg:hover .seg-add-btn{opacity:0.8}
+  .seg-add-btn:hover{color:var(--accent);background:rgba(232, 164, 74, 0.1);opacity:1!important}
+  textarea.seg-text{background:transparent;border:none;border-bottom:1px solid transparent;
+    color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.65;
+    width:100%;outline:none;resize:none;padding:2px 0;transition:border-color .15s}
+  textarea.seg-text:focus{border-bottom-color:var(--accent)}
+  textarea.seg-text.edited{border-bottom-color:var(--adim);color:#f0c070}
+  .seg-original{font-size:11px;color:#d09050;background:rgba(232,164,74,0.04);border-left:2.5px solid var(--accent);padding:4px 8px;margin-top:6px;border-radius:0 4px 4px 0;line-height:1.4;word-break:break-word}
+
+  /* Privacy blur styling */
+  body.privacy-active textarea.seg-text,
+  body.privacy-active #region-hint,
+  body.privacy-active .seg-original {
+    filter: blur(6px);
+    pointer-events: none;
+  }
+  textarea.seg-text, .seg-original {
+    transition: filter 0.25s ease;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .action{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:14px 0 2px;border-top:1px solid var(--border);margin-top:10px}
+  .edited-hint{font-size:11px;color:var(--accent)}
+  .autosave{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted);
+    display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .autosave.saving{color:var(--accent)}
+  .autosave.saved{color:var(--ok)}
+  .autosave.failed{color:var(--err)}
+
+  .prog-bar{width:100%;height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:12px}
+  .prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;box-shadow:0 0 6px var(--accent)}
+  .prog-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:9px 18px;font-size:13px;font-weight:500;z-index:100;
+    animation:up .2s ease;white-space:nowrap;display:none}
+  .toast.show{display:flex;align-items:center;gap:8px}
+  .toast.ok{border-color:var(--ok);color:var(--ok)}
+  .toast.err{border-color:var(--err);color:var(--err)}
+  @keyframes up{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:160px;color:var(--muted);gap:8px;font-size:13px;text-align:center}
+  kbd{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--border);
+    border-radius:4px;padding:1px 5px;color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo"><div class="dot"></div><span>STT Annotator</span></div>
+
+  <div class="mode-toggle">
+    <button class="btn-mode active" data-mode="manual" onclick="setMode('manual')">Manual</button>
+    <button class="btn-mode" data-mode="ai" onclick="setMode('ai')">AI</button>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center">
+    <span class="autosave" id="autosave-state"></span>
+    <button class="btn ghost" style="padding:6px 12px;font-size:11px;background:rgba(232,164,74,0.08);color:var(--accent);border:1px solid rgba(232,164,74,0.2)" onclick="showRulesModal()">📋 Rules</button>
+    <button class="btn ghost" id="privacy-btn" style="padding:6px 12px;font-size:11px;border:1px solid var(--border)" onclick="togglePrivacyMode()">👁️ Blur Text</button>
+    <span class="badge" id="count-badge">loading…</span>
+    <button class="btn ghost" style="padding:6px 12px;font-size:11px" onclick="loadSamples()">↺ Refresh</button>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- ── Studio: player + millisecond crop editor ─────────────────────── -->
+  <div class="studio" id="studio">
+    <div class="studio-top">
+      <button class="icon-btn" onclick="toggleStudio()" id="studio-toggle" title="Collapse / expand editor">▾</button>
+      <button class="icon-btn" onclick="seekBy(-5)" title="Back 5s">«</button>
+      <button class="icon-btn play-btn" id="play-btn" onclick="togglePlay()" title="Play / pause whole file (Space)">▶</button>
+      <button class="icon-btn" onclick="seekBy(5)" title="Forward 5s">»</button>
+      <button class="speed" id="speed-btn" onclick="cycleSpeed()" title="Playback speed">1×</button>
+      <div class="studio-sep"></div>
+      <div class="vol-row">
+        <span>🔈</span>
+        <input type="range" min="0" max="1" step="0.05" value="1" oninput="audio.volume=this.value">
+      </div>
+      <div class="studio-sep"></div>
+      <span class="studio-file" id="audio-name">—</span>
+      <span class="dur-pill" id="clock">0:00.000 / 0:00.000</span>
+      <div style="flex:1"></div>
+      <button class="nudge" onclick="zoomBy(0.5)" title="Zoom in (+)">🔍+</button>
+      <button class="nudge" onclick="zoomBy(2)" title="Zoom out (−)">🔍−</button>
+      <button class="nudge" onclick="fitRegion()" title="Fit selected segment">⤢ Fit</button>
+      <button class="nudge" onclick="zoomAll()" title="Show whole file">⤢ All</button>
+    </div>
+
+    <div class="studio-body">
+      <div class="wave-box">
+        <canvas id="overview-canvas"></canvas>
+        <span class="wave-tag" id="overview-tag" style="right:8px;bottom:4px">whole file</span>
+      </div>
+
+      <div class="wave-box">
+        <canvas id="zoom-canvas"></canvas>
+        <span class="wave-tag" id="lane-a" style="left:8px;top:22px">ch 1</span>
+        <span class="wave-tag" id="lane-b" style="left:8px;bottom:8px">ch 2</span>
+      </div>
+
+      <div class="region-bar">
+        <button class="region-play" id="region-play-btn" onclick="playRegion()" disabled>▶ Play segment</button>
+        <button class="toggle-btn" id="loop-btn" onclick="toggleLoop()" title="Loop the cropped region (L)">↻ Loop</button>
+        <div class="studio-sep"></div>
+
+        <span style="font-size:10px;color:var(--muted);letter-spacing:.08em">START</span>
+        <div class="nudge-group">
+          <button class="nudge" onclick="nudge('start',-0.1)">−100</button>
+          <button class="nudge" onclick="nudge('start',-0.01)">−10</button>
+        </div>
+        <input class="time-field" id="region-start" onchange="commitField('start', this)" onclick="this.select()">
+        <div class="nudge-group">
+          <button class="nudge" onclick="nudge('start',0.01)">+10</button>
+          <button class="nudge" onclick="nudge('start',0.1)">+100</button>
+        </div>
+
+        <span class="dur-pill" id="region-dur">—</span>
+
+        <div class="nudge-group">
+          <button class="nudge" onclick="nudge('end',-0.1)">−100</button>
+          <button class="nudge" onclick="nudge('end',-0.01)">−10</button>
+        </div>
+        <input class="time-field" id="region-end" onchange="commitField('end', this)" onclick="this.select()">
+        <div class="nudge-group">
+          <button class="nudge" onclick="nudge('end',0.01)">+10</button>
+          <button class="nudge" onclick="nudge('end',0.1)">+100</button>
+        </div>
+        <span style="font-size:10px;color:var(--muted);letter-spacing:.08em">END</span>
+
+        <span class="region-hint" id="region-hint">Select a segment to crop it</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- left -->
+    <div>
+      <div class="card">
+        <div class="clabel">Progress</div>
+        <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="prog-labels"><span id="prog-done">0 done</span><span id="prog-total">0 total</span></div>
+      </div>
+
+      <div class="card">
+        <div class="clabel">Queue</div>
+        <div class="queue" id="queue"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="clabel" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleFinishedCollapse()">
+          <span>Finished</span>
+          <span id="finished-toggle" style="font-size:10px;opacity:0.8">▼</span>
+        </div>
+        <div class="queue" id="finished-queue" style="max-height:220px;overflow-y:auto;display:none;margin-top:5px">
+          <div class="empty">None yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right -->
+    <div class="card" id="transcript-card" style="position:relative;display:flex;flex-direction:column;transition:border-color .3s, box-shadow .3s">
+      <!-- AI Reconstruction Loading Overlay -->
+      <div id="ai-loading-overlay" style="display:none; position:absolute; inset:0; background:rgba(15,15,15,0.7); backdrop-filter:blur(5px); z-index:15; align-items:center; justify-content:center; flex-direction:column; border-radius:12px; transition:all .3s">
+        <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--accent); text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px">
+          <span style="font-size:28px; animation: spin 1.5s linear infinite">✨</span>
+          <span style="letter-spacing:0.05em">Transcripts is under reconstruction…</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="clabel" style="margin-bottom:0">Transcript — <span id="seg-count">0</span> segments</div>
+        <div style="font-size:11px;color:var(--muted);display:flex;gap:8px">
+          <span style="color:var(--op)">■</span> Operator
+          <span style="color:var(--cu)">■</span> Müştəri
+        </div>
+      </div>
+      <div class="seg-list" id="seg-list"><div class="empty"><span style="font-size:32px;opacity:.3">📂</span>Select a file from the queue</div></div>
+      <div class="action">
+        <button class="btn primary" id="save-btn" onclick="save()">Save to Finished</button>
+        <button class="btn ghost" id="draft-btn" onclick="saveDraft()" style="border: 1px solid var(--accent); color: var(--accent)">Save Draft</button>
+        <button class="btn ghost" onclick="skip()">Skip →</button>
+        <select class="model-select" id="model-select">
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash (recommended)</option>
+          <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+          <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+        </select>
+        <button class="ai-btn" id="ai-btn" onclick="runAICorrection(false)">✨ AI Correct</button>
+        <button class="ai-audio-btn" id="ai-audio-btn" onclick="runAICorrection(true)">✨ AI + Audio</button>
+        <button class="fix-times-btn" id="adjust-times-btn" onclick="runTimestampAdjustment()">🕒 Fix Overlaps</button>
+        <button class="num-btn" id="num-btn" onclick="runNumberNormalization()" title="Convert digits to Azerbaijani words">🔢 Rəqəm → söz</button>
+        <span class="edited-hint" id="edited-hint" style="display:none"></span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.7">
+        Click a segment → crop it above &nbsp;•&nbsp; drag the <b style="color:var(--accent)">orange handles</b> for ms-accurate edges &nbsp;•&nbsp;
+        <kbd>Space</kbd> play/pause &nbsp;<kbd>P</kbd> play segment &nbsp;<kbd>L</kbd> loop &nbsp;<kbd>←</kbd><kbd>→</kbd> ±5s &nbsp;
+        <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> start ±10ms &nbsp;<kbd>Alt</kbd>+<kbd>←</kbd><kbd>→</kbd> end ±10ms
+        (hold <kbd>Ctrl</kbd> for 100ms) &nbsp;<kbd>,</kbd><kbd>.</kbd> prev/next segment &nbsp;<kbd>+</kbd><kbd>−</kbd> zoom
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rules Modal -->
+<div class="modal-backdrop" id="rules-modal" onclick="closeRulesModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" style="font-size:14px;font-weight:600">📋 Qaydalar (Transcription Rules)</div>
+      <button class="modal-close" onclick="closeRulesModal()">×</button>
+    </div>
+    <div class="modal-body" id="rules-content-area">
+      <div class="empty">Loading rules…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<audio id="audio"></audio>
+
+<script>
+const audio = document.getElementById('audio');
+let samples = [], finishedList = [], segments = [];
+let currentSampleName = '';
+let isCurrentFromFinished = false;
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+let speedIdx = 2;
+let currentMode = 'manual';
+let origLength = 0;
+
+// ── Time helpers (millisecond precision) ───────────────────────────────────
+function toSec(t) {
+  if (t === null || t === undefined || t === '') return 0;
+  if (typeof t === 'number') return t;
+  let total = 0;
+  for (const part of String(t).trim().split(':')) {
+    const v = parseFloat(part.replace(',', '.'));
+    total = total * 60 + (isFinite(v) ? v : 0);
+  }
+  return total;
+}
+/** "MM:SS.mmm" — the canonical on-screen / on-disk timestamp format. */
+function fmtMs(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const total = Math.round(sec * 1000);
+  const ms = total % 1000;
+  const whole = (total - ms) / 1000;
+  const m = Math.floor(whole / 60), s = whole % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+}
+function fmtShort(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  return `${m}:${String(Math.floor(sec % 60)).padStart(2,'0')}`;
+}
+const TIME_RE = /^\s*(\d{1,3}:)?\d{1,3}:\d{1,2}(?:[.,]\d{1,3})?\s*$|^\s*\d{1,4}(?:[.,]\d{1,3})?\s*$/;
+function parseTime(str) {
+  if (!TIME_RE.test(str || '')) return null;
+  return toSec(str);
+}
+
+// ── Rules Modal ──────────────────────────────────────────────────────────
+async function showRulesModal() {
+  const modal = document.getElementById('rules-modal');
+  modal.style.display = 'flex';
+  modal.offsetHeight; // Force reflow
+  modal.classList.add('show');
+
+  const contentArea = document.getElementById('rules-content-area');
+  try {
+    const res = await fetch('/api/rules').then(r => r.json());
+    if (res.ok && res.rules) {
+      contentArea.innerHTML = parseMarkdown(res.rules);
+    } else {
+      contentArea.innerHTML = `<div class="empty" style="color:var(--err)">Error loading rules: ${res.error}</div>`;
+    }
+  } catch (err) {
+    contentArea.innerHTML = `<div class="empty" style="color:var(--err)">Connection error loading rules</div>`;
+  }
+}
+
+function closeRulesModal(e) {
+  const modal = document.getElementById('rules-modal');
+  modal.classList.remove('show');
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 200);
+}
+
+function parseMarkdown(md) {
+  let html = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const blocks = [];
+  html = html.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, code) => {
+    const placeholder = `__CODE_BLOCK_${blocks.length}__`;
+    blocks.push(`<pre style="background:var(--bg);border:1px solid var(--border);padding:12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;overflow-x:auto;margin:12px 0;white-space:pre-wrap;color:#e0e0e0;line-height:1.5">${code.trim()}</pre>`);
+    return placeholder;
+  });
+
+  const lines = html.split('\n');
+  const parsedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return '';
+
+    if (trimmed.startsWith('__CODE_BLOCK_') && trimmed.endsWith('__')) {
+      const idx = parseInt(trimmed.replace('__CODE_BLOCK_', '').replace('__', ''), 10);
+      return blocks[idx];
+    }
+
+    if (trimmed.startsWith('# ')) {
+      return `<h1 style="color:var(--accent);font-size:18px;margin:24px 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px">${trimmed.slice(2)}</h1>`;
+    }
+    if (trimmed.startsWith('## ')) {
+      return `<h2 style="color:var(--accent);font-size:14px;margin:20px 0 8px;font-weight:600;letter-spacing:0.02em">${trimmed.slice(3)}</h2>`;
+    }
+
+    let parsedLine = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent);font-weight:600">$1</strong>');
+    return `<p style="font-size:12.5px;line-height:1.6;margin-bottom:6px;color:var(--text);opacity:0.95">${parsedLine}</p>`;
+  });
+
+  return parsedLines.filter(Boolean).join('\n');
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.btn-mode').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+  });
+
+  const aiBtn = document.getElementById('ai-btn');
+  const aiAudioBtn = document.getElementById('ai-audio-btn');
+  const modelSelect = document.getElementById('model-select');
+  const transcriptCard = document.getElementById('transcript-card');
+
+  if (mode === 'ai') {
+    aiBtn.style.display = 'inline-block';
+    if (aiAudioBtn) aiAudioBtn.style.display = 'inline-block';
+    if (modelSelect) modelSelect.style.display = 'inline-block';
+    if (transcriptCard) {
+      transcriptCard.style.border = '1px solid var(--accent)';
+      transcriptCard.style.boxShadow = '0 0 15px rgba(232, 164, 74, 0.15)';
+    }
+  } else {
+    aiBtn.style.display = 'none';
+    if (aiAudioBtn) aiAudioBtn.style.display = 'none';
+    if (modelSelect) modelSelect.style.display = 'none';
+    if (transcriptCard) {
+      transcriptCard.style.border = '1px solid var(--border)';
+      transcriptCard.style.boxShadow = 'none';
+    }
+  }
+}
+
+async function runAICorrection(useAudio = false) {
+  const aiBtn = document.getElementById('ai-btn');
+  const aiAudioBtn = document.getElementById('ai-audio-btn');
+
+  if (useAudio) {
+    if (aiAudioBtn) { aiAudioBtn.disabled = true; aiAudioBtn.textContent = '✨ Audio Aligning…'; }
+    if (aiBtn) aiBtn.disabled = true;
+  } else {
+    if (aiBtn) { aiBtn.disabled = true; aiBtn.textContent = '✨ Text Correcting…'; }
+    if (aiAudioBtn) aiAudioBtn.disabled = true;
+  }
+
+  const overlay = document.getElementById('ai-loading-overlay');
+  if (overlay) {
+    const textSpan = overlay.querySelector('span:last-child');
+    if (textSpan) {
+      textSpan.textContent = useAudio ? 'AI is aligning timestamps to audio & applying rules…' : 'AI is correcting text & applying rules…';
+    }
+    overlay.style.display = 'flex';
+  }
+
+  try {
+    const model = document.getElementById('model-select').value;
+    const previousSegments = segments.map((orig, idx) => ({
+      idx,
+      text: ('_origText' in orig && orig._origText !== null) ? orig._origText : orig.text,
+      speaker: ('_origSpeaker' in orig && orig._origSpeaker !== null) ? orig._origSpeaker : orig.speaker
+    }));
+
+    const res = await fetch('/api/ai/correct', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments: cleanSegments(), model, name: currentSampleName, use_audio: useAudio })
+    }).then(r => r.json());
+
+    if (res.ok && res.segments) {
+      const totalNew = res.segments.length;
+
+      segments = res.segments.map((seg, i) => {
+        let matchedOrig = null;
+
+        // Try exact timestamp match first if in text-only mode
+        const exactMatch = segments.find(s => s.start_time === seg.start_time && s.end_time === seg.end_time);
+        if (exactMatch && !useAudio) {
+          matchedOrig = {
+            text: ('_origText' in exactMatch && exactMatch._origText !== null) ? exactMatch._origText : exactMatch.text,
+            speaker: ('_origSpeaker' in exactMatch && exactMatch._origSpeaker !== null) ? exactMatch._origSpeaker : exactMatch.speaker
+          };
+        } else if (previousSegments.length === totalNew && previousSegments[i]) {
+          matchedOrig = previousSegments[i];
+        } else {
+          // Robust sequence/word-similarity match
+          const segClean = (seg.text || '').toLowerCase().replace(/[^\w\s]/g, '').trim();
+          const segWords = new Set(segClean.split(/\s+/).filter(w => w.length > 2));
+          const relPos = i / Math.max(1, totalNew);
+          let bestScore = -1;
+          let bestCandidate = null;
+
+          for (let j = 0; j < previousSegments.length; j++) {
+            const prev = previousSegments[j];
+            const prevRelPos = j / Math.max(1, previousSegments.length);
+            const posDist = Math.abs(relPos - prevRelPos);
+            if (posDist > 0.45) continue;
+
+            const prevClean = (prev.text || '').toLowerCase().replace(/[^\w\s]/g, '').trim();
+            const prevWords = new Set(prevClean.split(/\s+/).filter(w => w.length > 2));
+            let overlap = 0;
+            segWords.forEach(w => { if (prevWords.has(w)) overlap++; });
+
+            let score = (overlap * 10) - (posDist * 8);
+            if (seg.speaker === prev.speaker) score += 2;
+            if (score > bestScore) {
+              bestScore = score;
+              bestCandidate = prev;
+            }
+          }
+
+          if (bestScore > 0 && bestCandidate) {
+            matchedOrig = bestCandidate;
+          } else {
+            const fallbackIdx = Math.min(previousSegments.length - 1, Math.max(0, Math.round(relPos * (previousSegments.length - 1))));
+            matchedOrig = previousSegments[fallbackIdx] || null;
+          }
+        }
+
+        return {
+          ...seg,
+          _i: i,
+          _origText: matchedOrig ? matchedOrig.text : null,
+          _origSpeaker: matchedOrig ? matchedOrig.speaker : null,
+          _origStart: seg.start_time,
+          _origEnd: seg.end_time
+        };
+      });
+
+      activeIdx = -1;
+      renderSegments();
+      syncRegionUI();
+
+      // Update styling class for all updated segments in textarea
+      setTimeout(() => {
+        segments.forEach((seg, i) => {
+          const ta = document.querySelector(`#seg-${i} textarea.seg-text`);
+          if (ta) {
+            ta.className = 'seg-text' + (ta.value !== seg._origText ? ' edited' : '');
+            ta.rows = Math.max(1, Math.ceil(ta.value.length/58));
+          }
+        });
+      }, 50);
+
+      markDirty();
+      toast(useAudio ? 'Audio alignment & rules applied!' : 'AI text correction applied!', 'ok');
+    } else {
+      toast(res.error || 'AI correction failed', 'err');
+    }
+  } catch (err) {
+    toast('Error connecting to AI service', 'err');
+    console.error(err);
+  } finally {
+    if (aiBtn) { aiBtn.disabled = false; aiBtn.textContent = '✨ AI Correct'; }
+    if (aiAudioBtn) { aiAudioBtn.disabled = false; aiAudioBtn.textContent = '✨ AI + Audio'; }
+    if (overlay) overlay.style.display = 'none';
+  }
+}
+
+async function runTimestampAdjustment() {
+  const btn = document.getElementById('adjust-times-btn');
+  btn.disabled = true; btn.textContent = '🕒 Adjusting…';
+
+  try {
+    const res = await fetch('/api/ai/adjust_timestamps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments: cleanSegments(), name: currentSampleName })
+    }).then(r => r.json());
+
+    if (res.ok && res.segments) {
+      segments = res.segments.map((seg, i) => mergeMeta(seg, segments[i], i));
+      renderSegments();
+      syncRegionUI();
+      markDirty();
+      toast('Timestamps adjusted!', 'ok');
+    } else {
+      toast(res.error || 'Failed to adjust timestamps', 'err');
+    }
+  } catch (err) {
+    toast('Error adjusting timestamps', 'err');
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = '🕒 Fix Overlaps';
+  }
+}
+
+// ── Numbers → Azerbaijani words ────────────────────────────────────────────
+async function runNumberNormalization() {
+  const btn = document.getElementById('num-btn');
+  if (!segments.length) { toast('No transcript loaded', 'err'); return; }
+  btn.disabled = true; btn.textContent = '🔢 Converting…';
+  try {
+    const res = await fetch('/api/normalize_numbers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments: cleanSegments() })
+    }).then(r => r.json());
+
+    if (res.ok && res.segments) {
+      segments = res.segments.map((seg, i) => mergeMeta(seg, segments[i], i));
+      renderSegments();
+      if (res.changed) {
+        markDirty();
+        toast(`${res.changed} segment${res.changed > 1 ? 's' : ''} normalised`, 'ok');
+        if (res.notes && res.notes.length) console.info('Number conversion notes:', res.notes);
+      } else {
+        toast('No digits found', 'ok');
+      }
+    } else {
+      toast(res.error || 'Conversion failed', 'err');
+    }
+  } catch (err) {
+    toast('Error running number conversion', 'err');
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔢 Rəqəm → söz';
+  }
+}
+
+/** Strip UI-only bookkeeping fields before sending segments to the backend. */
+function cleanSegments() {
+  return segments.map(({_i, _origText, _origSpeaker, _origStart, _origEnd, ...s}) => s);
+}
+/** Re-attach the original-value bookkeeping after a server round-trip. */
+function mergeMeta(seg, prev, i) {
+  return {
+    ...seg,
+    _i: i,
+    _origText: prev ? ('_origText' in prev ? prev._origText : prev.text) : seg.text,
+    _origSpeaker: prev ? ('_origSpeaker' in prev ? prev._origSpeaker : prev.speaker) : seg.speaker,
+    _origStart: prev ? prev._origStart : seg.start_time,
+    _origEnd: prev ? prev._origEnd : seg.end_time
+  };
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+window.onload = () => { setupCanvases(); setupAudio(); setupKeys(); loadSamples(); };
+
+async function loadSamples() {
+  const res = await fetch('/api/samples').then(r => r.json());
+  samples = res;
+
+  const finRes = await fetch('/api/finished').then(r => r.json());
+  finishedList = finRes;
+
+  document.getElementById('count-badge').textContent = samples.length + ' remaining';
+  renderQueue();
+  renderFinishedQueue();
+  updateProgress();
+
+  if (samples.length > 0 && !currentSampleName) {
+    loadSample(samples[0].name, false);
+  } else if (finishedList.length > 0 && !currentSampleName) {
+    loadSample(finishedList[0], true);
+  } else if (samples.length === 0 && finishedList.length === 0) {
+    document.getElementById('seg-list').innerHTML = '<div class="empty"><span style="font-size:32px">🎉</span>All done! Upload the finished/ folder to OneDrive.</div>';
+  }
+}
+
+// ── Load one sample ────────────────────────────────────────────────────────
+async function loadSample(name, fromFinished = false) {
+  await flushAutosave();
+
+  currentSampleName = name;
+  isCurrentFromFinished = fromFinished;
+  audio.pause();
+  regionPlaying = false;
+  activeIdx = -1;
+  document.getElementById('play-btn').textContent = '▶';
+
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) {
+    saveBtn.textContent = fromFinished ? 'Update Finished' : 'Save to Finished';
+  }
+
+  // transcript
+  const raw = await fetch(`/api/transcript/${name}`).then(r => r.text());
+  segments = raw.trim().split('\n').map((line, i) => {
+    try {
+      const s = JSON.parse(line);
+      return { ...s, _i: i, _origText: s.text, _origSpeaker: s.speaker,
+               _origStart: s.start_time, _origEnd: s.end_time };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+  origLength = segments.length;
+
+  document.getElementById('audio-name').textContent = name;
+  document.getElementById('audio-name').title = name;
+  document.getElementById('seg-count').textContent = segments.length;
+  renderSegments();
+  renderQueue();
+  renderFinishedQueue();
+  updateProgress();
+  setAutosaveState(fromFinished ? 'manual' : 'idle');
+
+  await loadAudio(name);
+  if (segments.length) setActiveSegment(0, { play: false });
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderQueue() {
+  const el = document.getElementById('queue');
+  if (!samples.length) { el.innerHTML = '<div class="empty">Queue is empty</div>'; return; }
+  el.innerHTML = samples.map((s, i) => {
+    const isWorking = s.status === 'working';
+    return `
+    <div class="qitem${(!isCurrentFromFinished && s.name===currentSampleName)?' active':''}" onclick="loadSample('${s.name}', false)">
+      📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span>
+      ${isWorking ? '<span class="badge" style="background:var(--adim);color:var(--accent);border:1px solid rgba(232,164,74,0.3);margin-right:8px;padding:1px 6px">working</span>' : ''}
+      <span class="qnum">#${i+1}</span>
+    </div>`;
+  }).join('');
+}
+
+function timeLabel(seg) {
+  return `${fmtMs(toSec(seg.start_time))} → ${fmtMs(toSec(seg.end_time))}`;
+}
+function timeShifted(seg) {
+  return Math.round(toSec(seg.start_time)*1000) !== Math.round(toSec(seg._origStart)*1000)
+      || Math.round(toSec(seg.end_time)*1000)   !== Math.round(toSec(seg._origEnd)*1000);
+}
+
+function renderSegments() {
+  document.getElementById('seg-list').innerHTML = segments.map((seg, i) => {
+    const op = seg.speaker === 'Operator' || seg.speaker?.toLowerCase().includes('operator');
+    const textChanged = seg.text !== seg._origText;
+    const speakerChanged = seg.speaker !== seg._origSpeaker;
+    const showOrig = textChanged || speakerChanged;
+
+    let diffHtml = '';
+    if (showOrig) {
+      const isNew = seg._origText === null || seg._origText === undefined;
+      const speakerDiff = speakerChanged ? `Speaker: <del style="color:#FF453A;text-decoration:line-through">${seg._origSpeaker}</del> → <ins style="color:#5DBF85;text-decoration:underline">${seg.speaker}</ins><br>` : '';
+      const textDiff = isNew ? `[New Segment] Diff: ${diffWords('', seg.text || '')}` : `Diff: ${diffWords(seg._origText || '', seg.text || '')}`;
+      diffHtml = speakerDiff + textDiff;
+    }
+
+    return `
+    <div class="seg ${op?'op':'cu'}${i===activeIdx?' active-crop':''}" id="seg-${i}" onclick="jumpTo(${i})">
+      <div class="seg-meta">
+        <span class="seg-speaker ${op?'op':'cu'}" onclick="toggleSpeaker(${i}, event)">${seg.speaker}</span>
+        <input class="seg-time${timeShifted(seg)?' shifted':''}" value="${timeLabel(seg)}" onchange="editTime(${i}, this)" onclick="event.stopPropagation()">
+        <button class="seg-crop-btn" onclick="event.stopPropagation(); setActiveSegment(${i}, {play:false})" title="Crop this segment on the waveform">✂️ Crop</button>
+        <button class="seg-delete-btn" onclick="deleteSegment(${i}, event)" title="Delete segment">🗑️ Delete</button>
+        <button class="seg-add-btn" onclick="addSegmentBelow(${i}, event)" title="Add segment below">➕ Add Below</button>
+      </div>
+      <div style="width:100%">
+        <textarea class="seg-text${textChanged?' edited':''}" rows="${Math.max(1,Math.ceil((seg.text||'').length/58))}"
+          oninput="editSeg(${i},this)" onclick="event.stopPropagation()">${seg.text}</textarea>
+        <div class="seg-original" id="orig-${i}" style="display:${showOrig?'block':'none'}">
+          ${diffHtml}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateEditHint();
+}
+
+function updateProgress() {
+  const done = finishedList.length;
+  const total = samples.length + finishedList.length;
+  const pct = total ? (done / total) * 100 : 0;
+
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-done').textContent = done+' done';
+  document.getElementById('prog-total').textContent = total+' total';
+}
+
+let isFinishedCollapsed = true;
+function toggleFinishedCollapse() {
+  const el = document.getElementById('finished-queue');
+  const toggle = document.getElementById('finished-toggle');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    toggle.textContent = '▲';
+    isFinishedCollapsed = false;
+  } else {
+    el.style.display = 'none';
+    toggle.textContent = '▼';
+    isFinishedCollapsed = true;
+  }
+}
+
+function renderFinishedQueue() {
+  const el = document.getElementById('finished-queue');
+  if (!finishedList.length) { el.innerHTML = '<div class="empty">No finished files yet</div>'; return; }
+  el.innerHTML = finishedList.map((name, i) => `
+    <div class="qitem${(isCurrentFromFinished && name===currentSampleName)?' active':''}" onclick="loadSample('${name}', true)" style="border-left:3px solid var(--ok)">
+      📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">${name}</span>
+      <button class="icon-btn" style="width:24px;height:24px;font-size:10px;margin-left:5px;flex-shrink:0" onclick="requeue('${name}', event)" title="Re-queue (remove from finished)">↩</button>
+    </div>`).join('');
+}
+
+async function requeue(name, event) {
+  event.stopPropagation();
+  if (confirm(`Move "${name}" back to the active queue? This will remove it from the finished folder.`)) {
+    try {
+      const res = await fetch('/api/requeue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      }).then(r => r.json());
+
+      if (res.ok) {
+        toast('Moved back to queue', 'ok');
+        if (currentSampleName === name) {
+          isCurrentFromFinished = false;
+        }
+        await loadSamples();
+      } else {
+        toast(res.error || 'Re-queue failed', 'err');
+      }
+    } catch (err) {
+      toast('Network error', 'err');
+    }
+  }
+}
+
+function editSeg(i, ta) {
+  const seg = segments[i];
+  seg.text = ta.value;
+  const textChanged = ta.value !== seg._origText;
+  ta.className = 'seg-text'+(textChanged?' edited':'');
+  ta.rows = Math.max(1, Math.ceil(ta.value.length/58));
+
+  const origEl = document.getElementById(`orig-${i}`);
+  if (origEl) {
+    const speakerChanged = seg.speaker !== seg._origSpeaker;
+    origEl.style.display = (textChanged || speakerChanged) ? 'block' : 'none';
+
+    const isNew = seg._origText === null || seg._origText === undefined;
+    const speakerDiff = speakerChanged ? `Speaker: <del style="color:#FF453A;text-decoration:line-through">${seg._origSpeaker}</del> → <ins style="color:#5DBF85;text-decoration:underline">${seg.speaker}</ins><br>` : '';
+    const textDiff = isNew ? `[New Segment] Diff: ${diffWords('', seg.text || '')}` : `Diff: ${diffWords(seg._origText || '', seg.text || '')}`;
+    origEl.innerHTML = speakerDiff + textDiff;
+  }
+  updateEditHint();
+  markDirty();
+}
+
+function toggleSpeaker(i, event) {
+  event.stopPropagation();
+  const seg = segments[i];
+  const isOp = seg.speaker === 'Operator' || seg.speaker?.toLowerCase().includes('operator');
+  const newSpeaker = isOp ? 'Müştəri' : 'Operator';
+  seg.speaker = newSpeaker;
+
+  const segEl = document.getElementById(`seg-${i}`);
+  if (segEl) {
+    segEl.classList.remove('op', 'cu');
+    segEl.classList.add(newSpeaker === 'Operator' ? 'op' : 'cu');
+
+    const speakerEl = segEl.querySelector('.seg-speaker');
+    if (speakerEl) {
+      speakerEl.classList.remove('op', 'cu');
+      speakerEl.classList.add(newSpeaker === 'Operator' ? 'op' : 'cu');
+      speakerEl.textContent = newSpeaker;
+    }
+
+    const origEl = document.getElementById(`orig-${i}`);
+    if (origEl) {
+      const textChanged = seg.text !== seg._origText;
+      const speakerChanged = newSpeaker !== seg._origSpeaker;
+      origEl.style.display = (textChanged || speakerChanged) ? 'block' : 'none';
+
+      const isNew = seg._origText === null || seg._origText === undefined;
+      const speakerDiff = speakerChanged ? `Speaker: <del style="color:#FF453A;text-decoration:line-through">${seg._origSpeaker}</del> → <ins style="color:#5DBF85;text-decoration:underline">${newSpeaker}</ins><br>` : '';
+      const textDiff = isNew ? `[New Segment] Diff: ${diffWords('', seg.text || '')}` : `Diff: ${diffWords(seg._origText || '', seg.text || '')}`;
+      origEl.innerHTML = speakerDiff + textDiff;
+    }
+  }
+  updateEditHint();
+  markDirty();
+  drawZoom();
+}
+
+function diffWords(oldStr, newStr) {
+  if (!oldStr) {
+    return (newStr || '').split(/\s+/).filter(Boolean).map(w => `<ins style="color:#5DBF85;text-decoration:underline;font-weight:600">${w}</ins>`).join(' ');
+  }
+  if (!newStr) {
+    return (oldStr || '').split(/\s+/).filter(Boolean).map(w => `<del style="color:#FF453A;text-decoration:line-through;opacity:0.8">${w}</del>`).join(' ');
+  }
+  const oldWords = oldStr.trim().split(/\s+/);
+  const newWords = newStr.trim().split(/\s+/);
+
+  const dp = Array(oldWords.length + 1).fill(null).map(() => Array(newWords.length + 1).fill(0));
+  for (let i = 1; i <= oldWords.length; i++) {
+    for (let j = 1; j <= newWords.length; j++) {
+      if (oldWords[i - 1].toLowerCase() === newWords[j - 1].toLowerCase()) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  let i = oldWords.length;
+  let j = newWords.length;
+  const result = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldWords[i - 1].toLowerCase() === newWords[j - 1].toLowerCase()) {
+      result.unshift(oldWords[i - 1]);
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift(`<ins style="color:#5DBF85;text-decoration:underline;font-weight:600">${newWords[j - 1]}</ins>`);
+      j--;
+    } else {
+      result.unshift(`<del style="color:#FF453A;text-decoration:line-through;opacity:0.8">${oldWords[i - 1]}</del>`);
+      i--;
+    }
+  }
+
+  return result.join(' ');
+}
+
+/** Inline timestamp editing — accepts MM:SS, MM:SS.mmm and HH:MM:SS.mmm. */
+function editTime(i, input) {
+  const parts = input.value.split(/→|->|\bto\b|(?<=\d)\s*-\s*(?=\d)/);
+  const a = parts.length > 1 ? parseTime(parts[0]) : null;
+  const b = parts.length > 1 ? parseTime(parts[1]) : null;
+
+  if (a === null || b === null || b < a) {
+    input.style.color = 'var(--err)';
+    toast('Invalid format. Use MM:SS.mmm → MM:SS.mmm', 'err');
+    return;
+  }
+  segments[i].start_time = fmtMs(a);
+  segments[i].end_time = fmtMs(b);
+  input.style.color = '';
+  input.value = timeLabel(segments[i]);
+  input.classList.toggle('shifted', timeShifted(segments[i]));
+  if (i === activeIdx) { syncRegionUI(); fitRegion(); }
+  drawZoom(); drawOverviewOverlay();
+  updateEditHint();
+  markDirty();
+}
+
+function deleteSegment(i, event) {
+  event.stopPropagation();
+  if (confirm('Are you sure you want to delete this segment?')) {
+    segments.splice(i, 1);
+    segments.forEach((seg, idx) => { seg._i = idx; });
+    if (activeIdx > i) activeIdx--;
+    if (activeIdx >= segments.length) activeIdx = segments.length - 1;
+    renderSegments();
+    document.getElementById('seg-count').textContent = segments.length;
+    syncRegionUI();
+    updateEditHint();
+    markDirty();
+  }
+}
+
+function addSegmentBelow(i, event) {
+  event.stopPropagation();
+  const currentSeg = segments[i];
+  const startSec = toSec(currentSeg.end_time);
+  const nextSeg = segments[i + 1];
+  const limit = nextSeg ? toSec(nextSeg.start_time) : startSec + 3;
+  const endSec = Math.max(startSec + 0.2, Math.min(startSec + 3, limit));
+
+  const isCurrentOp = currentSeg.speaker === 'Operator' || currentSeg.speaker?.toLowerCase().includes('operator');
+  const predictedSpeaker = isCurrentOp ? 'Müştəri' : 'Operator';
+
+  const newSeg = {
+    start_time: fmtMs(startSec),
+    end_time: fmtMs(endSec),
+    speaker: predictedSpeaker,
+    text: '',
+    _origText: null,
+    _origSpeaker: null,
+    _origStart: fmtMs(startSec),
+    _origEnd: fmtMs(endSec)
+  };
+
+  segments.splice(i + 1, 0, newSeg);
+  segments.forEach((seg, idx) => { seg._i = idx; });
+  renderSegments();
+  document.getElementById('seg-count').textContent = segments.length;
+  setActiveSegment(i + 1, { play: false });
+  updateEditHint();
+  markDirty();
+}
+
+function updateEditHint() {
+  const newSegments = segments.filter(s => s._origText === null || s._origText === undefined).length;
+  const modifiedSegments = segments.filter(s => s._origText !== null && s._origText !== undefined && (s.text !== s._origText || s.speaker !== s._origSpeaker)).length;
+  const retimedSegments = segments.filter(s => s._origStart !== undefined && timeShifted(s)).length;
+  const remainingOriginals = segments.filter(s => s._origText !== null && s._origText !== undefined).length;
+  const deletedSegments = Math.max(0, origLength - remainingOriginals);
+
+  const totalEdits = newSegments + modifiedSegments + deletedSegments + retimedSegments;
+  const h = document.getElementById('edited-hint');
+
+  if (totalEdits) {
+    let msg = `${totalEdits} edit${totalEdits>1?'s':''}`;
+    const details = [];
+    if (modifiedSegments > 0) details.push(`${modifiedSegments} modified`);
+    if (retimedSegments > 0) details.push(`${retimedSegments} re-timed`);
+    if (newSegments > 0) details.push(`${newSegments} added`);
+    if (deletedSegments > 0) details.push(`${deletedSegments} deleted`);
+
+    if (details.length > 0) {
+      msg += ` (${details.join(', ')})`;
+    }
+    h.textContent = msg;
+    h.style.display = '';
+  } else {
+    h.style.display = 'none';
+  }
+}
+
+// ── Autosave (drafts) ──────────────────────────────────────────────────────
+let autosaveTimer = null;
+let autosaveInFlight = null;
+let pendingChanges = false;
+
+function setAutosaveState(state) {
+  const el = document.getElementById('autosave-state');
+  if (!el) return;
+  el.className = 'autosave' + (state === 'saving' ? ' saving' : state === 'saved' ? ' saved' : state === 'failed' ? ' failed' : '');
+  el.textContent = {
+    idle: '', pending: '● unsaved', saving: '↻ saving…',
+    saved: '✓ auto-saved', failed: '✕ autosave failed',
+    manual: 'finished file — manual save'
+  }[state] ?? '';
+}
+
+/** Any edit funnels through here: schedules a debounced draft save. */
+function markDirty() {
+  if (!currentSampleName) return;
+  updateEditHint();
+  if (isCurrentFromFinished) { setAutosaveState('manual'); return; }
+  pendingChanges = true;
+  setAutosaveState('pending');
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(runAutosave, 700);
+}
+
+async function runAutosave() {
+  if (!pendingChanges || !currentSampleName || isCurrentFromFinished) return;
+  pendingChanges = false;
+  setAutosaveState('saving');
+  const name = currentSampleName;
+  const content = cleanSegments().map(s => JSON.stringify(s)).join('\n');
+  autosaveInFlight = (async () => {
+    try {
+      const res = await fetch('/api/save_draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, content })
+      }).then(r => r.json());
+      setAutosaveState(res.ok ? 'saved' : 'failed');
+      if (res.ok) markQueueWorking(name);
+    } catch (err) {
+      setAutosaveState('failed');
+    } finally {
+      autosaveInFlight = null;
+    }
+  })();
+  await autosaveInFlight;
+}
+
+/** Make sure nothing is left unsaved before switching files or leaving. */
+async function flushAutosave() {
+  clearTimeout(autosaveTimer);
+  if (pendingChanges) await runAutosave();
+  if (autosaveInFlight) await autosaveInFlight;
+}
+
+function markQueueWorking(name) {
+  const entry = samples.find(s => s.name === name);
+  if (entry && entry.status !== 'working') {
+    entry.status = 'working';
+    renderQueue();
+  }
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (!pendingChanges || isCurrentFromFinished || !currentSampleName) return;
+  const content = cleanSegments().map(s => JSON.stringify(s)).join('\n');
+  navigator.sendBeacon('/api/save_draft',
+    new Blob([JSON.stringify({ name: currentSampleName, content })], { type: 'application/json' }));
+});
+
+// ── Save / Skip / Drafts ───────────────────────────────────────────────────
+async function save() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  clearTimeout(autosaveTimer);
+  pendingChanges = false;
+
+  const content = cleanSegments().map(s => JSON.stringify(s)).join('\n');
+  const res = await fetch('/api/save', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name: currentSampleName, content})
+  }).then(r=>r.json());
+
+  btn.disabled = false;
+  btn.textContent = isCurrentFromFinished ? 'Update Finished' : 'Save to Finished';
+
+  if (res.ok) {
+    setAutosaveState('idle');
+    toast('Saved ✓','ok');
+    await loadSamples();
+    next();
+  }
+  else toast('Save failed','err');
+}
+
+async function saveDraft() {
+  const btn = document.getElementById('draft-btn');
+  btn.disabled = true; btn.textContent = 'Saving Draft…';
+  clearTimeout(autosaveTimer);
+  pendingChanges = false;
+
+  const content = cleanSegments().map(s => JSON.stringify(s)).join('\n');
+  try {
+    const res = await fetch('/api/save_draft', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name: currentSampleName, content})
+    }).then(r=>r.json());
+
+    if (res.ok) {
+      setAutosaveState('saved');
+      toast('Draft saved ✓','ok');
+      markQueueWorking(currentSampleName);
+    } else {
+      setAutosaveState('failed');
+      toast('Draft save failed','err');
+    }
+  } catch (err) {
+    setAutosaveState('failed');
+    toast('Draft save error','err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Draft';
+  }
+}
+
+function skip() {
+  toast('Skipped →');
+  if (!isCurrentFromFinished) {
+    const curIdx = samples.findIndex(s => s.name === currentSampleName);
+    if (curIdx !== -1 && curIdx + 1 < samples.length) {
+      loadSample(samples[curIdx + 1].name, false);
+    } else {
+      toast('End of queue', 'ok');
+    }
+  } else {
+    const curIdx = finishedList.indexOf(currentSampleName);
+    if (curIdx !== -1 && curIdx + 1 < finishedList.length) {
+      loadSample(finishedList[curIdx + 1], true);
+    } else {
+      toast('End of finished list', 'ok');
+    }
+  }
+}
+
+function next() {
+  if (samples.length > 0) {
+    loadSample(samples[0].name, false);
+  } else if (finishedList.length > 0) {
+    toast('Queue is empty! Loading from Finished.', 'ok');
+    loadSample(finishedList[0], true);
+  } else {
+    toast('All done! 🎉','ok');
+    loadSamples();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  WAVEFORM STUDIO — decoding, drawing, and millisecond cropping
+// ══════════════════════════════════════════════════════════════════════════
+let wave = null;            // {channels:[Float32Array…], sampleRate, duration}
+let overviewCache = null;   // pre-rendered whole-file waveform
+let viewStart = 0, viewEnd = 0;
+let activeIdx = -1;
+let regionLoop = false, regionPlaying = false;
+let laneSpeakers = ['ch 1', 'ch 2'];
+let audioObjectUrl = null;
+
+const MIN_REGION = 0.02;    // 20 ms — the shortest crop we allow
+const MIN_VIEW = 0.3;       // 300 ms — deepest zoom (≈0.25 ms per pixel)
+
+const overviewCanvas = document.getElementById('overview-canvas');
+const zoomCanvas = document.getElementById('zoom-canvas');
+const octx = overviewCanvas.getContext('2d');
+const zctx = zoomCanvas.getContext('2d');
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function setupCanvases() {
+  const resize = () => {
+    for (const c of [overviewCanvas, zoomCanvas]) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = c.getBoundingClientRect();
+      c.width = Math.max(1, Math.round(rect.width * dpr));
+      c.height = Math.max(1, Math.round(rect.height * dpr));
+      c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    overviewCache = null;
+    drawAll();
+  };
+  window.addEventListener('resize', resize);
+  resize();
+  attachZoomHandlers();
+  overviewCanvas.addEventListener('click', (e) => {
+    if (!wave) return;
+    const r = overviewCanvas.getBoundingClientRect();
+    seekTo(((e.clientX - r.left) / r.width) * wave.duration);
+  });
+}
+
+// ── WAV decoding (PCM 8/16/24/32, float32, A-law, μ-law) ───────────────────
+const ULAW = new Float32Array(256), ALAW = new Float32Array(256);
+(function buildCompandingTables() {
+  for (let i = 0; i < 256; i++) {
+    let u = ~i & 0xFF;
+    let t = (((u & 0x0F) << 3) + 0x84) << ((u >> 4) & 0x07);
+    t -= 0x84;
+    ULAW[i] = ((u & 0x80) ? -t : t) / 32768;
+
+    let a = i ^ 0x55;
+    const sign = a & 0x80;
+    const exp = (a >> 4) & 0x07;
+    let mant = a & 0x0F;
+    let v = exp ? ((mant << 4) + 0x108) << (exp - 1) : (mant << 4) + 8;
+    ALAW[i] = (sign ? -v : v) / 32768;
+  }
+})();
+
+function decodeWav(buffer) {
+  const dv = new DataView(buffer);
+  if (dv.byteLength < 44) return null;
+  if (dv.getUint32(0, false) !== 0x52494646 /*RIFF*/ || dv.getUint32(8, false) !== 0x57415645 /*WAVE*/) return null;
+
+  let pos = 12, fmt = null, dataOffset = 0, dataLength = 0;
+  while (pos + 8 <= dv.byteLength) {
+    const id = dv.getUint32(pos, false);
+    const size = dv.getUint32(pos + 4, true);
+    const body = pos + 8;
+    if (id === 0x666d7420 /*"fmt "*/) {
+      fmt = {
+        format: dv.getUint16(body, true),
+        channels: dv.getUint16(body + 2, true),
+        sampleRate: dv.getUint32(body + 4, true),
+        bits: dv.getUint16(body + 14, true)
+      };
+      if (fmt.format === 0xFFFE && size >= 40) fmt.format = dv.getUint16(body + 24, true);
+    } else if (id === 0x64617461 /*"data"*/) {
+      dataOffset = body;
+      dataLength = Math.min(size, dv.byteLength - body);
+      break;
+    }
+    pos = body + size + (size % 2);
+  }
+  if (!fmt || !dataOffset || !fmt.channels) return null;
+
+  const bytesPerSample = Math.max(1, fmt.bits >> 3);
+  const frameSize = bytesPerSample * fmt.channels;
+  const frames = Math.floor(dataLength / frameSize);
+  if (frames <= 0) return null;
+
+  const channels = [];
+  for (let c = 0; c < fmt.channels; c++) channels.push(new Float32Array(frames));
+
+  const readers = {
+    ulaw:  (o) => ULAW[dv.getUint8(o)],
+    alaw:  (o) => ALAW[dv.getUint8(o)],
+    pcm8:  (o) => (dv.getUint8(o) - 128) / 128,
+    pcm16: (o) => dv.getInt16(o, true) / 32768,
+    pcm24: (o) => ((dv.getUint8(o) | (dv.getUint8(o+1) << 8) | (dv.getInt8(o+2) << 16))) / 8388608,
+    pcm32: (o) => dv.getInt32(o, true) / 2147483648,
+    f32:   (o) => dv.getFloat32(o, true),
+    f64:   (o) => dv.getFloat64(o, true)
+  };
+  let read;
+  if (fmt.format === 7) read = readers.ulaw;
+  else if (fmt.format === 6) read = readers.alaw;
+  else if (fmt.format === 3) read = fmt.bits === 64 ? readers.f64 : readers.f32;
+  else if (fmt.format === 1) read = readers['pcm' + fmt.bits];
+  if (!read) return null;
+
+  for (let f = 0; f < frames; f++) {
+    const base = dataOffset + f * frameSize;
+    for (let c = 0; c < fmt.channels; c++) channels[c][f] = read(base + c * bytesPerSample);
+  }
+  return { channels, sampleRate: fmt.sampleRate, duration: frames / fmt.sampleRate };
+}
+
+async function decodeViaWebAudio(buffer) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    const buf = await ctx.decodeAudioData(buffer.slice(0));
+    const channels = [];
+    for (let c = 0; c < buf.numberOfChannels; c++) channels.push(buf.getChannelData(c));
+    ctx.close();
+    return { channels, sampleRate: buf.sampleRate, duration: buf.duration };
+  } catch (err) {
+    console.warn('decodeAudioData failed', err);
+    return null;
+  }
+}
+
+async function loadAudio(name) {
+  wave = null; overviewCache = null;
+  if (audioObjectUrl) { URL.revokeObjectURL(audioObjectUrl); audioObjectUrl = null; }
+  drawAll();
+  try {
+    const buffer = await fetch(`/api/audio/${name}`).then(r => {
+      if (!r.ok) throw new Error('no audio');
+      return r.arrayBuffer();
+    });
+    audioObjectUrl = URL.createObjectURL(new Blob([buffer]));
+    audio.src = audioObjectUrl;
+    audio.load();
+    wave = decodeWav(buffer) || await decodeViaWebAudio(buffer);
+  } catch (err) {
+    audio.removeAttribute('src');
+    console.warn('audio load failed', err);
+  }
+  if (wave) {
+    viewStart = 0; viewEnd = wave.duration;
+    detectLaneSpeakers();
+  }
+  overviewCache = null;
+  drawAll();
+}
+
+/** Call recordings are 2-channel with one speaker per channel — label the lanes. */
+function detectLaneSpeakers() {
+  if (!wave || wave.channels.length < 2 || !segments.length) {
+    laneSpeakers = wave && wave.channels.length > 1 ? ['ch 1', 'ch 2'] : ['audio', ''];
+    updateLaneTags();
+    return;
+  }
+  const score = [0, 0];
+  for (const seg of segments) {
+    const isOp = (seg.speaker || '').toLowerCase().includes('operator');
+    const a = Math.floor(toSec(seg.start_time) * wave.sampleRate);
+    const b = Math.min(wave.channels[0].length, Math.floor(toSec(seg.end_time) * wave.sampleRate));
+    if (b <= a) continue;
+    const step = Math.max(1, Math.floor((b - a) / 400));
+    for (let c = 0; c < 2; c++) {
+      let sum = 0, n = 0;
+      for (let i = a; i < b; i += step) { sum += Math.abs(wave.channels[c][i]); n++; }
+      if (n) score[c] += (isOp ? 1 : -1) * (sum / n);
+    }
+  }
+  const opLane = score[0] >= score[1] ? 0 : 1;
+  laneSpeakers = opLane === 0 ? ['Operator', 'Müştəri'] : ['Müştəri', 'Operator'];
+  updateLaneTags();
+}
+
+function updateLaneTags() {
+  const a = document.getElementById('lane-a'), b = document.getElementById('lane-b');
+  a.textContent = laneSpeakers[0] || '';
+  b.textContent = laneSpeakers[1] || '';
+  a.style.color = laneSpeakers[0] === 'Operator' ? css('--op') : laneSpeakers[0] === 'Müştəri' ? css('--cu') : css('--muted');
+  b.style.color = laneSpeakers[1] === 'Operator' ? css('--op') : laneSpeakers[1] === 'Müştəri' ? css('--cu') : css('--muted');
+}
+
+// ── Drawing ────────────────────────────────────────────────────────────────
+/** Draw one channel's min/max envelope inside a band. */
+function drawChannel(ctx, data, sampleRate, t0, t1, x0, w, midY, halfH, color) {
+  const total = data.length;
+  const startSample = Math.max(0, Math.floor(t0 * sampleRate));
+  const endSample = Math.min(total, Math.ceil(t1 * sampleRate));
+  if (endSample <= startSample) return;
+  const perPx = (endSample - startSample) / w;
+
+  ctx.fillStyle = color;
+  for (let px = 0; px < w; px++) {
+    const a = startSample + Math.floor(px * perPx);
+    const b = Math.min(endSample, startSample + Math.floor((px + 1) * perPx));
+    let min = 0, max = 0;
+    const step = Math.max(1, Math.floor((b - a) / 512));
+    for (let i = a; i < b; i += step) {
+      const v = data[i];
+      if (v < min) min = v; else if (v > max) max = v;
+    }
+    const yTop = midY - max * halfH;
+    const yBot = midY - min * halfH;
+    ctx.fillRect(x0 + px, yTop, 1, Math.max(1, yBot - yTop));
+  }
+}
+
+function drawAll() { drawOverview(); drawZoom(); }
+
+function drawOverview() {
+  const w = overviewCanvas.clientWidth, h = overviewCanvas.clientHeight;
+  if (w <= 0 || h <= 0) return;          // hidden / not laid out yet
+  if (!overviewCache && wave) {
+    const off = document.createElement('canvas');
+    const dpr = window.devicePixelRatio || 1;
+    off.width = Math.round(w * dpr); off.height = Math.round(h * dpr);
+    const c = off.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = css('--bg'); c.fillRect(0, 0, w, h);
+    const lanes = wave.channels.length > 1 ? 2 : 1;
+    for (let i = 0; i < lanes; i++) {
+      const color = lanes === 1 ? '#4a4a4e'
+        : (laneSpeakers[i] === 'Operator' ? 'rgba(107,159,228,.55)' : 'rgba(93,191,133,.55)');
+      drawChannel(c, wave.channels[i], wave.sampleRate, 0, wave.duration, 0, w, h / 2, h / 2 - 3, color);
+    }
+    overviewCache = off;
+  }
+  drawOverviewOverlay();
+}
+
+function drawOverviewOverlay() {
+  const w = overviewCanvas.clientWidth, h = overviewCanvas.clientHeight;
+  if (w <= 0 || h <= 0) return;
+  octx.clearRect(0, 0, w, h);
+  octx.fillStyle = css('--bg'); octx.fillRect(0, 0, w, h);
+  if (overviewCache) octx.drawImage(overviewCache, 0, 0, w, h);
+  if (!wave) {
+    octx.fillStyle = css('--muted'); octx.font = "11px 'JetBrains Mono', monospace";
+    octx.fillText('no audio loaded', 10, h / 2 + 4);
+    return;
+  }
+  const x = (t) => (t / wave.duration) * w;
+
+  // zoom viewport
+  octx.fillStyle = 'rgba(232,164,74,.10)';
+  octx.fillRect(x(viewStart), 0, Math.max(2, x(viewEnd) - x(viewStart)), h);
+  octx.strokeStyle = 'rgba(232,164,74,.5)'; octx.lineWidth = 1;
+  octx.strokeRect(x(viewStart) + .5, .5, Math.max(2, x(viewEnd) - x(viewStart)) - 1, h - 1);
+
+  // active region
+  if (activeIdx >= 0 && segments[activeIdx]) {
+    const s = x(toSec(segments[activeIdx].start_time)), e = x(toSec(segments[activeIdx].end_time));
+    octx.fillStyle = css('--accent');
+    octx.fillRect(s, h - 3, Math.max(2, e - s), 3);
+  }
+
+  // playhead
+  const px = x(audio.currentTime || 0);
+  octx.fillStyle = '#fff'; octx.fillRect(px, 0, 1, h);
+}
+
+function niceStep(span, w) {
+  const steps = [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10,15,30,60,120,300,600];
+  for (const s of steps) if ((s / span) * w >= 62) return s;
+  return steps[steps.length - 1];
+}
+
+function drawZoom() {
+  const w = zoomCanvas.clientWidth, h = zoomCanvas.clientHeight;
+  if (w <= 0 || h <= 0) return;
+  zctx.clearRect(0, 0, w, h);
+  zctx.fillStyle = css('--bg'); zctx.fillRect(0, 0, w, h);
+
+  if (!wave) {
+    zctx.fillStyle = css('--muted'); zctx.font = "12px 'JetBrains Mono', monospace";
+    zctx.fillText('waveform unavailable', 12, h / 2);
+    return;
+  }
+
+  const RULER = 16;
+  const span = Math.max(1e-4, viewEnd - viewStart);
+  const x = (t) => ((t - viewStart) / span) * w;
+
+  // ── ruler ──
+  const step = niceStep(span, w);
+  zctx.fillStyle = 'rgba(255,255,255,.03)'; zctx.fillRect(0, 0, w, RULER);
+  zctx.font = "9.5px 'JetBrains Mono', monospace";
+  for (let t = Math.ceil(viewStart / step) * step; t <= viewEnd; t += step) {
+    const px = Math.round(x(t)) + .5;
+    zctx.strokeStyle = 'rgba(255,255,255,.09)';
+    zctx.beginPath(); zctx.moveTo(px, RULER); zctx.lineTo(px, h); zctx.stroke();
+    zctx.strokeStyle = 'rgba(255,255,255,.28)';
+    zctx.beginPath(); zctx.moveTo(px, RULER - 5); zctx.lineTo(px, RULER); zctx.stroke();
+    zctx.fillStyle = css('--muted');
+    zctx.fillText(step < 1 ? fmtMs(t).slice(0, -1) : fmtShort(t), px + 3, 10);
+  }
+
+  // ── waveform lanes ──
+  const body = h - RULER;
+  const lanes = wave.channels.length > 1 ? 2 : 1;
+  for (let i = 0; i < lanes; i++) {
+    const top = RULER + (body / lanes) * i;
+    const mid = top + (body / lanes) / 2;
+    const half = (body / lanes) / 2 - 4;
+    const color = lanes === 1 ? '#5a5a5f'
+      : (laneSpeakers[i] === 'Operator' ? 'rgba(107,159,228,.75)' : 'rgba(93,191,133,.75)');
+    drawChannel(zctx, wave.channels[i], wave.sampleRate, viewStart, viewEnd, 0, w, mid, half, color);
+    zctx.strokeStyle = 'rgba(255,255,255,.05)';
+    zctx.beginPath(); zctx.moveTo(0, mid + .5); zctx.lineTo(w, mid + .5); zctx.stroke();
+  }
+
+  // ── neighbouring segments (context) ──
+  segments.forEach((seg, i) => {
+    if (i === activeIdx) return;
+    const s = toSec(seg.start_time), e = toSec(seg.end_time);
+    if (e < viewStart || s > viewEnd) return;
+    const isOp = (seg.speaker || '').toLowerCase().includes('operator');
+    zctx.fillStyle = isOp ? 'rgba(107,159,228,.22)' : 'rgba(93,191,133,.22)';
+    zctx.fillRect(x(s), RULER, Math.max(1, x(e) - x(s)), 3);
+  });
+
+  // ── crop region ──
+  if (activeIdx >= 0 && segments[activeIdx]) {
+    const s = toSec(segments[activeIdx].start_time), e = toSec(segments[activeIdx].end_time);
+    const xs = x(s), xe = x(e);
+
+    zctx.fillStyle = 'rgba(0,0,0,.55)';
+    zctx.fillRect(0, RULER, Math.max(0, xs), body);
+    zctx.fillRect(Math.min(w, xe), RULER, Math.max(0, w - xe), body);
+
+    zctx.fillStyle = 'rgba(232,164,74,.07)';
+    zctx.fillRect(xs, RULER, Math.max(1, xe - xs), body);
+
+    drawHandle(xs, RULER, body, 'left');
+    drawHandle(xe, RULER, body, 'right');
+
+    // duration chip
+    const label = ((e - s)).toFixed(3) + 's';
+    zctx.font = "600 10px 'JetBrains Mono', monospace";
+    const tw = zctx.measureText(label).width;
+    const cx = Math.min(Math.max((xs + xe) / 2, tw / 2 + 8), w - tw / 2 - 8);
+    zctx.fillStyle = 'rgba(232,164,74,.9)';
+    zctx.fillRect(cx - tw / 2 - 5, RULER + 4, tw + 10, 14);
+    zctx.fillStyle = '#0F0F0F';
+    zctx.fillText(label, cx - tw / 2, RULER + 14.5);
+  }
+
+  // ── playhead ──
+  const px = x(audio.currentTime || 0);
+  if (px >= -2 && px <= w + 2) {
+    zctx.fillStyle = '#fff'; zctx.fillRect(px, RULER, 1.5, body);
+    zctx.beginPath(); zctx.moveTo(px - 4, RULER); zctx.lineTo(px + 5, RULER); zctx.lineTo(px + .5, RULER + 5);
+    zctx.closePath(); zctx.fill();
+  }
+}
+
+function drawHandle(px, top, body, side) {
+  const W = 9;
+  const x0 = side === 'left' ? px - W : px;
+  zctx.fillStyle = css('--accent');
+  zctx.fillRect(x0, top, W, body);
+  zctx.fillRect(px - 0.5, top, 1.5, body);
+  zctx.fillStyle = 'rgba(15,15,15,.75)';
+  const gy = top + body / 2;
+  for (let i = -1; i <= 1; i++) zctx.fillRect(x0 + 2.5, gy + i * 5 - 0.5, 4, 1.5);
+}
+
+// ── Zoom / view control ────────────────────────────────────────────────────
+function clampView() {
+  if (!wave) return;
+  let span = Math.min(Math.max(viewEnd - viewStart, MIN_VIEW), wave.duration);
+  if (viewStart < 0) viewStart = 0;
+  viewEnd = viewStart + span;
+  if (viewEnd > wave.duration) { viewEnd = wave.duration; viewStart = Math.max(0, viewEnd - span); }
+}
+function zoomBy(factor, anchor) {
+  if (!wave) return;
+  const span = viewEnd - viewStart;
+  const a = anchor === undefined ? (viewStart + viewEnd) / 2 : anchor;
+  const newSpan = Math.min(Math.max(span * factor, MIN_VIEW), wave.duration);
+  const ratio = (a - viewStart) / span;
+  viewStart = a - newSpan * ratio;
+  viewEnd = viewStart + newSpan;
+  clampView(); drawAll();
+}
+function zoomAll() { if (!wave) return; viewStart = 0; viewEnd = wave.duration; drawAll(); }
+function fitRegion() {
+  if (!wave || activeIdx < 0 || !segments[activeIdx]) return;
+  const s = toSec(segments[activeIdx].start_time), e = toSec(segments[activeIdx].end_time);
+  const pad = Math.max((e - s) * 0.45, 0.6);
+  viewStart = Math.max(0, s - pad);
+  viewEnd = Math.min(wave.duration, e + pad);
+  if (viewEnd - viewStart < MIN_VIEW) viewEnd = viewStart + MIN_VIEW;
+  clampView(); drawAll();
+}
+
+// ── Segment selection & region editing ─────────────────────────────────────
+function setActiveSegment(i, opts = {}) {
+  if (i < 0 || i >= segments.length) return;
+  const changed = activeIdx !== i;
+  if (activeIdx >= 0) document.getElementById(`seg-${activeIdx}`)?.classList.remove('active-crop');
+  activeIdx = i;
+  const el = document.getElementById(`seg-${i}`);
+  if (el) {
+    el.classList.add('active-crop');
+    if (opts.scroll) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  if (changed || opts.refit !== false) fitRegion();
+  syncRegionUI();
+  drawAll();
+  if (opts.play) playRegion(); else seekTo(toSec(segments[i].start_time));
+}
+
+function syncRegionUI() {
+  const seg = segments[activeIdx];
+  const startEl = document.getElementById('region-start');
+  const endEl = document.getElementById('region-end');
+  const durEl = document.getElementById('region-dur');
+  const hintEl = document.getElementById('region-hint');
+  const playBtn = document.getElementById('region-play-btn');
+
+  if (!seg) {
+    startEl.value = ''; endEl.value = ''; durEl.textContent = '—';
+    hintEl.textContent = 'Select a segment to crop it';
+    playBtn.disabled = true;
+    return;
+  }
+  const s = toSec(seg.start_time), e = toSec(seg.end_time);
+  if (document.activeElement !== startEl) startEl.value = fmtMs(s);
+  if (document.activeElement !== endEl) endEl.value = fmtMs(e);
+  durEl.textContent = (e - s).toFixed(3) + ' s';
+  hintEl.textContent = `#${activeIdx + 1} · ${seg.speaker} · ${(seg.text || '').slice(0, 60)}`;
+  playBtn.disabled = false;
+
+  const input = document.querySelector(`#seg-${activeIdx} .seg-time`);
+  if (input && document.activeElement !== input) {
+    input.value = timeLabel(seg);
+    input.classList.toggle('shifted', timeShifted(seg));
+  }
+}
+
+/** Move one edge of the active segment; keeps a minimum duration. */
+function setRegion(start, end, opts = {}) {
+  const seg = segments[activeIdx];
+  if (!seg) return;
+  const limit = wave ? wave.duration : Math.max(end, 1e6);
+  start = Math.max(0, Math.min(start, limit));
+  end = Math.max(0, Math.min(end, limit));
+  if (end - start < MIN_REGION) {
+    if (opts.moved === 'start') start = end - MIN_REGION;
+    else end = start + MIN_REGION;
+    start = Math.max(0, start); end = Math.min(limit, end);
+  }
+  seg.start_time = fmtMs(start);
+  seg.end_time = fmtMs(end);
+  syncRegionUI();
+  updateEditHint();
+  drawZoom(); drawOverviewOverlay();
+  markDirty();
+}
+
+function nudge(edge, delta) {
+  const seg = segments[activeIdx];
+  if (!seg) return;
+  const s = toSec(seg.start_time), e = toSec(seg.end_time);
+  if (edge === 'start') setRegion(s + delta, e, { moved: 'start' });
+  else setRegion(s, e + delta, { moved: 'end' });
+}
+
+function commitField(edge, input) {
+  const seg = segments[activeIdx];
+  if (!seg) return;
+  const v = parseTime(input.value);
+  if (v === null) { toast('Use MM:SS.mmm', 'err'); syncRegionUI(); return; }
+  const s = toSec(seg.start_time), e = toSec(seg.end_time);
+  if (edge === 'start') setRegion(v, e, { moved: 'start' });
+  else setRegion(s, v, { moved: 'end' });
+}
+
+// ── Pointer interaction on the zoom canvas ─────────────────────────────────
+function attachZoomHandlers() {
+  let mode = null, moved = false, grabOffset = 0, downX = 0, downRegion = null;
+
+  const timeAt = (clientX) => {
+    const r = zoomCanvas.getBoundingClientRect();
+    const ratio = (clientX - r.left) / r.width;
+    return viewStart + ratio * (viewEnd - viewStart);
+  };
+  const pxPerSec = () => zoomCanvas.clientWidth / Math.max(1e-6, viewEnd - viewStart);
+
+  const hitTest = (clientX) => {
+    const seg = segments[activeIdx];
+    if (!seg) return null;
+    const r = zoomCanvas.getBoundingClientRect();
+    const px = clientX - r.left;
+    const scale = pxPerSec();
+    const xs = (toSec(seg.start_time) - viewStart) * scale;
+    const xe = (toSec(seg.end_time) - viewStart) * scale;
+    if (Math.abs(px - xs) <= 10) return 'start';
+    if (Math.abs(px - xe) <= 10) return 'end';
+    if (px > xs && px < xe) return 'move';
+    return null;
+  };
+
+  zoomCanvas.addEventListener('pointermove', (e) => {
+    if (mode) return;
+    const hit = hitTest(e.clientX);
+    zoomCanvas.style.cursor = (hit === 'start' || hit === 'end') ? 'ew-resize'
+      : hit === 'move' ? 'grab' : 'crosshair';
+  });
+
+  zoomCanvas.addEventListener('pointerdown', (e) => {
+    if (!wave) return;
+    e.preventDefault();
+    // capture can be refused (synthetic events, some pen/touch stacks) — the drag still works
+    try { zoomCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+    downX = e.clientX; moved = false;
+    const seg = segments[activeIdx];
+    mode = hitTest(e.clientX) || 'seek';
+    if (seg) {
+      downRegion = { s: toSec(seg.start_time), e: toSec(seg.end_time) };
+      grabOffset = timeAt(e.clientX) - downRegion.s;
+    }
+    if (mode === 'seek') seekTo(timeAt(e.clientX));
+  });
+
+  zoomCanvas.addEventListener('pointermove', (e) => {
+    if (!mode) return;
+    if (Math.abs(e.clientX - downX) > 2) moved = true;
+    const t = timeAt(e.clientX);
+
+    if (mode === 'start') setRegion(t, downRegion.e, { moved: 'start' });
+    else if (mode === 'end') setRegion(downRegion.s, t, { moved: 'end' });
+    else if (mode === 'move' && moved) {
+      const dur = downRegion.e - downRegion.s;
+      let s = t - grabOffset;
+      s = Math.max(0, Math.min(s, (wave ? wave.duration : s) - dur));
+      setRegion(s, s + dur);
+      zoomCanvas.style.cursor = 'grabbing';
+    } else if (mode === 'seek') {
+      seekTo(t);
+    }
+  });
+
+  const finish = (e) => {
+    if (!mode) return;
+    if (mode === 'move' && !moved) seekTo(timeAt(e.clientX));
+    mode = null; downRegion = null;
+    zoomCanvas.style.cursor = 'crosshair';
+  };
+  zoomCanvas.addEventListener('pointerup', finish);
+  zoomCanvas.addEventListener('pointercancel', finish);
+
+  zoomCanvas.addEventListener('wheel', (e) => {
+    if (!wave) return;
+    e.preventDefault();
+    if (e.shiftKey) {
+      const span = viewEnd - viewStart;
+      const d = Math.sign(e.deltaY || e.deltaX) * span * 0.15;
+      viewStart += d; viewEnd += d; clampView(); drawAll();
+    } else {
+      const r = zoomCanvas.getBoundingClientRect();
+      const anchor = viewStart + ((e.clientX - r.left) / r.width) * (viewEnd - viewStart);
+      zoomBy(e.deltaY > 0 ? 1.25 : 0.8, anchor);
+    }
+  }, { passive: false });
+}
+
+// ── Player ─────────────────────────────────────────────────────────────────
+let rafId = null;
+let regionTimer = null;
+
+/** Painting only — requestAnimationFrame stalls whenever the page is hidden. */
+function tick() {
+  drawZoom();
+  drawOverviewOverlay();
+  updateClock();
+  highlightPlaying();
+  if (!audio.paused) rafId = requestAnimationFrame(tick);
+  else { rafId = null; drawZoom(); drawOverviewOverlay(); }
+}
+function startTicking() { if (rafId === null) rafId = requestAnimationFrame(tick); }
+
+/**
+ * Region playback boundary. Runs on a timer rather than rAF so the crop still
+ * stops at its end when the tab is in the background.
+ */
+function watchRegion() {
+  if (!regionPlaying || activeIdx < 0 || !segments[activeIdx]) { stopRegionWatch(); return; }
+  const end = toSec(segments[activeIdx].end_time);
+  if (audio.currentTime < end - 0.004) return;
+  if (regionLoop) {
+    audio.currentTime = toSec(segments[activeIdx].start_time);
+  } else {
+    audio.pause();
+    regionPlaying = false;
+    stopRegionWatch();
+    document.getElementById('play-btn').textContent = '▶';
+  }
+}
+function startRegionWatch() {
+  stopRegionWatch();
+  regionTimer = setInterval(watchRegion, 15);
+}
+function stopRegionWatch() {
+  if (regionTimer !== null) { clearInterval(regionTimer); regionTimer = null; }
+}
+
+function setupAudio() {
+  audio.addEventListener('play', () => {
+    document.getElementById('play-btn').textContent = '⏸';
+    startTicking();
+    if (regionPlaying) startRegionWatch();
+  });
+  audio.addEventListener('pause', () => {
+    document.getElementById('play-btn').textContent = '▶';
+    regionPlaying = false;
+    stopRegionWatch();
+  });
+  audio.addEventListener('ended', () => {
+    document.getElementById('play-btn').textContent = '▶';
+    regionPlaying = false;
+    stopRegionWatch();
+  });
+  audio.addEventListener('seeked', () => { updateClock(); drawZoom(); drawOverviewOverlay(); });
+  audio.addEventListener('loadedmetadata', updateClock);
+}
+
+function updateClock() {
+  const dur = (wave && wave.duration) || audio.duration || 0;
+  document.getElementById('clock').textContent = `${fmtMs(audio.currentTime || 0)} / ${fmtMs(dur)}`;
+}
+
+function highlightPlaying() {
+  const t = audio.currentTime;
+  segments.forEach((seg, i) => {
+    const el = document.getElementById(`seg-${i}`);
+    if (el) el.classList.toggle('playing', t >= toSec(seg.start_time) && t <= toSec(seg.end_time));
+  });
+}
+
+function seekTo(t) {
+  const dur = (wave && wave.duration) || audio.duration || 0;
+  audio.currentTime = Math.max(0, Math.min(dur || t, t));
+  updateClock(); drawZoom(); drawOverviewOverlay();
+}
+function seekBy(d) { seekTo((audio.currentTime || 0) + d); }
+
+function togglePlay() {
+  if (audio.paused) { regionPlaying = false; stopRegionWatch(); audio.play(); }
+  else audio.pause();
+}
+
+/** The crop editor's play button: plays only the selected region. */
+function playRegion() {
+  const seg = segments[activeIdx];
+  if (!seg) return;
+  audio.currentTime = toSec(seg.start_time);
+  regionPlaying = true;
+  startRegionWatch();
+  audio.play();
+}
+function toggleLoop() {
+  regionLoop = !regionLoop;
+  document.getElementById('loop-btn').classList.toggle('on', regionLoop);
+}
+
+function toggleStudio() {
+  const s = document.getElementById('studio');
+  s.classList.toggle('collapsed');
+  document.getElementById('studio-toggle').textContent = s.classList.contains('collapsed') ? '▸' : '▾';
+  if (!s.classList.contains('collapsed')) { overviewCache = null; setTimeout(drawAll, 0); }
+}
+
+function jumpTo(i) { setActiveSegment(i, { play: true }); }
+
+function cycleSpeed() {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  audio.playbackRate = SPEEDS[speedIdx];
+  document.getElementById('speed-btn').textContent = SPEEDS[speedIdx] + '×';
+}
+
+function setupKeys() {
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    const fine = e.ctrlKey || e.metaKey ? 0.1 : 0.01;
+
+    if (e.code === 'Space') { e.preventDefault(); togglePlay(); return; }
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      const dir = e.code === 'ArrowRight' ? 1 : -1;
+      if (e.shiftKey) { e.preventDefault(); nudge('start', dir * fine); return; }
+      if (e.altKey)   { e.preventDefault(); nudge('end',   dir * fine); return; }
+      e.preventDefault(); seekBy(dir * 5); return;
+    }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); playRegion(); return; }
+    if (e.key === 'l' || e.key === 'L') { e.preventDefault(); toggleLoop(); return; }
+    if (e.key === ',') { e.preventDefault(); setActiveSegment(activeIdx - 1, { scroll: true }); return; }
+    if (e.key === '.') { e.preventDefault(); setActiveSegment(activeIdx + 1, { scroll: true }); return; }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(0.5); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(2); return; }
+  });
+}
+
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=(type==='ok'?'✓ ':type==='err'?'✕ ':'→ ')+msg;
+  el.className=`toast show${type?' '+type:''}`;
+  clearTimeout(el._t); el._t=setTimeout(()=>el.className='toast',2800);
+}
+
+let privacyActive = false;
+function togglePrivacyMode() {
+  privacyActive = !privacyActive;
+  document.body.classList.toggle('privacy-active', privacyActive);
+  const btn = document.getElementById('privacy-btn');
+  if (privacyActive) {
+    btn.innerHTML = '👁️ Show Text';
+    btn.style.borderColor = 'var(--err)';
+    btn.style.color = 'var(--err)';
+    btn.style.background = 'rgba(255, 69, 58, 0.08)';
+  } else {
+    btn.innerHTML = '👁️ Blur Text';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.background = '';
+  }
+}
+</script>
+</body>
+</html>

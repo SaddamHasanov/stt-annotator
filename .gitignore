@@ -1,0 +1,29 @@
+.env
+
+# Ignore all files in audio/ except .gitkeep
+audio/*
+!audio/.gitkeep
+
+# Ignore all files in transcripts/ except .gitkeep
+transcripts/*
+!transcripts/.gitkeep
+example.jsonl
+# Ignore all files in finished/ except .gitkeep
+finished/*
+!finished/.gitkeep
+
+
+working/
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Output of tools/az_num2words.py and its in-place backups
+normalized/
+*.jsonl.bak
